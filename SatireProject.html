@@ -252,6 +252,14 @@
     animation: fadeIn 0.4s ease forwards;
   }
   .done-badge::before { content: '✓'; font-size: 11px; }
+
+  .paused-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; color: #f87171;
+    margin-top: 6px; opacity: 0;
+    animation: fadeIn 0.4s ease forwards;
+  }
+  .paused-badge::before { content: '✕'; font-size: 11px; }
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 
   .day-divider {
@@ -388,6 +396,42 @@
     letter-spacing: 0.01em;
   }
 
+  .s1-notes {
+    margin-top: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+  }
+
+  .s1-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(124,106,255,0.06);
+    border: 1px solid rgba(124,106,255,0.15);
+    border-left: 3px solid rgba(124,106,255,0.5);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+
+  .s1-note-icon {
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    opacity: 0.7;
+  }
+
+  .s1-note em {
+    color: #a899ff;
+    font-style: normal;
+  }
+
   .next-btn {
     margin-top: 52px;
     display: inline-flex; align-items: center; gap: 10px;
@@ -455,35 +499,34 @@
 
   .research-title-line {
     font-family: 'Syne', sans-serif;
-    font-size: 24px; font-weight: 700;
-    color: #ffffff;
+    font-size: 22px; font-weight: 700;
+    color: var(--text);
     margin-bottom: 28px;
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: baseline; gap: 10px;
   }
 
-  .research-title-line .field-label { color: #c8c8d8; font-size: 14px; font-family: 'DM Mono', monospace; font-weight: 400; }
+  .research-title-line .field-label { color: var(--text-dim); font-size: 13px; font-family: 'DM Mono', monospace; font-weight: 400; }
   .research-title-line .field-value { color: var(--accent); }
 
   .field-row {
     display: flex; align-items: baseline;
     gap: 0;
-    padding: 14px 0;
+    padding: 13px 0;
     border-bottom: 1px solid rgba(30,30,46,0.6);
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.5;
   }
 
   .field-row:last-child { border-bottom: none; padding-bottom: 0; }
 
   .field-key {
-    color: #d0d0e0;
+    color: var(--text-dim);
     white-space: nowrap;
     flex-shrink: 0;
-    font-size: 13.5px;
+    font-size: 12px;
     letter-spacing: 0.02em;
-    font-weight: 500;
   }
 
   .field-blank {
@@ -524,7 +567,14 @@
       This is the conversation between an AI and a student,<br>
       who is working on a history research project in 2100.
     </div>
-    <div>Note: This assignent is all written by hand,<br> the website is coded by a human,<br> and doesn't have anything to do with AI</div>
+    <div class="s1-notes">
+      <div class="s1-note">
+        <span>This assignment is all written by hand — the website is coded by a human, and doesn't have anything to do with AI.</span>
+      </div>
+      <div class="s1-note">
+        <span>Although this piece is fictional, all examples and images mentioned before <em>2026</em> are real.</span>
+      </div>
+    </div>
     <button class="next-btn" onclick="goToScreen2()">
       Next
       <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -591,7 +641,7 @@
     <div class="welcome" id="welcome">
       <span class="welcome-icon">◈</span>
       <h2>Hello, I'm AURA</h2>
-      <p>Your question is being typed below. Click Send when ready.</p>
+      <p>Send the chat when ready.</p>
     </div>
     <div class="day-divider" style="display:none;" id="divider"><span>TODAY</span></div>
   </div>
@@ -620,6 +670,13 @@
 const TYPING_EFFECT = true;
 // ─────────────────────────────────────────────────────────────────────
 
+// ─── LAST RESPONSE THINKING TIME (ms) ────────────────────────────────
+// Controls how long the "thinking" animation shows before the LAST AI response.
+// The default for all other responses is 2000–3000ms (random).
+// Set to a specific number, e.g. 5000 for 5 seconds, or null to use the default.
+const LAST_RESPONSE_THINKING_TIME = 8000;
+// ─────────────────────────────────────────────────────────────────────
+
 let conversation = [];
 let currentStep = 0;
 let isAITyping = false;
@@ -636,7 +693,6 @@ fetch('conversation.json')
   })
   .catch(err => {
     console.error(err);
-    // Show a visible error in the input box so the user knows
     const txt = document.getElementById('inputText');
     const box = document.getElementById('inputBox');
     if (txt) { txt.textContent = '⚠ Failed to load conversation.json'; box.className = 'input-box idle'; }
@@ -650,7 +706,6 @@ function goToScreen2() {
     document.getElementById('screen1').classList.add('out');
     const s2 = document.getElementById('screen2');
     s2.classList.remove('out');
-    // reset and replay s2 inner animation
     const inner = s2.querySelector('.s2-inner');
     inner.style.animation = 'none';
     inner.style.opacity = '0';
@@ -688,7 +743,6 @@ function typeQuestion(index) {
   btn.disabled = true;
 
   if (!TYPING_EFFECT) {
-    // Instant: show full question immediately
     cursor.style.display = 'none';
     txt.textContent = q;
     isQTyping = false;
@@ -731,6 +785,9 @@ function handleSend() {
   const a = conversation[currentStep].a;
   const t = conversation[currentStep].t || null;
 
+  // Determine if this is the last step
+  const isLastStep = (currentStep === conversation.length - 1);
+
   btn.disabled = true;
   box.className = 'input-box idle';
   cursor.style.display = 'none';
@@ -751,7 +808,13 @@ function handleSend() {
   // User bubble
   appendBubble('user', q);
 
-  // Thinking → AI types
+  // Thinking duration:
+  // - If last step AND LAST_RESPONSE_THINKING_TIME is set → use that fixed value
+  // - Otherwise → random 2000–3000ms
+  const thinkingDuration = (isLastStep && LAST_RESPONSE_THINKING_TIME !== null)
+    ? LAST_RESPONSE_THINKING_TIME
+    : 2000 + Math.random() * 1000;
+
   setTimeout(() => {
     const thinking = appendThinking(t);
     setTimeout(() => {
@@ -772,7 +835,7 @@ function handleSend() {
           cursor.style.display = 'none';
         }
       });
-    }, 1500 + Math.random() * 800);
+    }, thinkingDuration);
   }, 280);
 }
 
@@ -820,6 +883,8 @@ function appendThinking(thinkingText) {
 
 function typeAIResponse(text, onDone) {
   isAITyping = true;
+  const paused = text.includes('(paused)');
+  const displayText = text.replace(/\s*\(paused\)/g, '').trimEnd();
   const messages = document.getElementById('messages');
   const row = document.createElement('div');
   row.className = 'message-row ai';
@@ -835,33 +900,30 @@ function typeAIResponse(text, onDone) {
   bubble.removeAttribute('id');
 
   if (!TYPING_EFFECT) {
-    // Instant: render full markdown at once
-    bubble.innerHTML = parseMarkdown(text);
+    bubble.innerHTML = parseMarkdown(displayText);
     scrollBottom();
     const badge = document.createElement('div');
-    badge.className = 'done-badge';
-    badge.textContent = 'Response complete';
+    badge.className = paused ? 'paused-badge' : 'done-badge';
+    badge.textContent = paused ? 'Response paused' : 'Response complete';
     row.querySelector('.msg-col').appendChild(badge);
     isAITyping = false;
     onDone();
     return;
   }
 
-  // Typing effect: build plain text char-by-char, then re-render markdown each tick
   let i = 0;
   let partial = '';
   const cur = document.createElement('span');
   cur.className = 'cursor';
 
   function next() {
-    if (i < text.length) {
-      partial += text[i];
+    if (i < displayText.length) {
+      partial += displayText[i];
       i++;
-      // Render markdown of what we have so far, append cursor after
       bubble.innerHTML = parseMarkdown(partial);
       bubble.appendChild(cur);
       scrollBottom();
-      const c = text[i - 1];
+      const c = displayText[i - 1];
       const d = '.!?'.includes(c) ? 55 + Math.random() * 40
               : ',;:'.includes(c) ? 28 + Math.random() * 20
               : c === ' '         ? 16 + Math.random() * 12
@@ -869,10 +931,10 @@ function typeAIResponse(text, onDone) {
       setTimeout(next, d);
     } else {
       cur.remove();
-      bubble.innerHTML = parseMarkdown(text);
+      bubble.innerHTML = parseMarkdown(displayText);
       const badge = document.createElement('div');
-      badge.className = 'done-badge';
-      badge.textContent = 'Response complete';
+      badge.className = paused ? 'paused-badge' : 'done-badge';
+      badge.textContent = paused ? 'Response paused' : 'Response complete';
       row.querySelector('.msg-col').appendChild(badge);
       isAITyping = false;
       onDone();
@@ -899,12 +961,9 @@ function esc(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Converts a markdown string to safe HTML
 function parseMarkdown(raw) {
-  // First escape HTML special chars
   let s = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  // Split into lines for block-level processing
   const lines = s.split('\n');
   const out = [];
   let inUL = false, inOL = false;
@@ -917,12 +976,10 @@ function parseMarkdown(raw) {
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
 
-    // Headings
     if (/^### (.+)/.test(line)) { closeList(); out.push(`<h3>${inline(line.replace(/^### /,''))}</h3>`); continue; }
     if (/^## (.+)/.test(line))  { closeList(); out.push(`<h2>${inline(line.replace(/^## /,''))}</h2>`); continue; }
     if (/^# (.+)/.test(line))   { closeList(); out.push(`<h1>${inline(line.replace(/^# /,''))}</h1>`); continue; }
 
-    // Unordered list: * item or - item
     const ulMatch = line.match(/^(\s*)[*\-] (.+)/);
     if (ulMatch) {
       if (inOL) { out.push('</ol>'); inOL = false; }
@@ -931,7 +988,6 @@ function parseMarkdown(raw) {
       continue;
     }
 
-    // Ordered list: 1. item
     const olMatch = line.match(/^\d+\. (.+)/);
     if (olMatch) {
       if (inUL) { out.push('</ul>'); inUL = false; }
@@ -942,7 +998,11 @@ function parseMarkdown(raw) {
 
     closeList();
 
-    // Empty line → paragraph break
+    if (/\.(webp|jpg|jpeg|png|gif)$/i.test(line.trim())) {
+      out.push(`<img src="${line.trim()}" style="max-width:100%;max-height:320px;border-radius:8px;margin:6px 0;display:block;">`);
+      continue;
+    }
+
     if (line.trim() === '') {
       out.push('<br>');
       continue;
@@ -955,7 +1015,6 @@ function parseMarkdown(raw) {
   return out.join('');
 }
 
-// Inline formatting: **bold**, *italic*, `code`
 function inline(s) {
   return s
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
